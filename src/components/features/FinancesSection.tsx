@@ -19,8 +19,15 @@ import { ru } from 'date-fns/locale'
 import { nowMoscow, formatMonthYearMoscow } from '@/lib/tz'
 import { formatInTimeZone } from 'date-fns-tz'
 
+import dynamic from 'next/dynamic'
+
 const TZ = 'Europe/Moscow'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+
+// Весь блок recharts загружается лениво — экономит ~90kB на начальной загрузке
+const FinancesChart = dynamic(() => import('./FinancesChart'), {
+  ssr: false,
+  loading: () => <div className="h-[200px] bg-gray-50 dark:bg-gray-800 rounded-xl animate-pulse" />,
+})
 
 interface FinancesSectionProps {
   businessId: string
@@ -139,22 +146,11 @@ export function FinancesSection({ businessId, title }: FinancesSectionProps) {
           </Card>
         </div>
 
-        {/* Chart */}
+        {/* Chart — динамический импорт */}
         <Card>
           <CardContent className="p-5">
             <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">Динамика за 6 месяцев</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData} barCategoryGap="30%">
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
-                <Tooltip
-                  formatter={(value: number, name: string) => [formatCurrency(value), name === 'income' ? 'Доход' : 'Расход']}
-                  contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: 12 }}
-                />
-                <Bar dataKey="income" fill="#10b981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expense" fill="#f87171" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <FinancesChart data={chartData} formatCurrency={formatCurrency} />
           </CardContent>
         </Card>
 

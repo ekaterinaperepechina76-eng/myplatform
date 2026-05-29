@@ -8,3 +8,38 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Статические ассеты — кеш на год (immutable)
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Шрифты и иконки
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Изображения — кеш на неделю
+[[headers]]
+  for = "/images/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
+
+# HTML страницы — no-cache (динамические)
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# Редирект www → без www
+[[redirects]]
+  from = "https://www.myplatform-personal.netlify.app/*"
+  to = "https://myplatform-personal.netlify.app/:splat"
+  status = 301
+  force = true

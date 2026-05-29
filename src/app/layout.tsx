@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { ThemeProvider } from '@/contexts/ThemeContext'
-import { AuthProvider } from '@/contexts/AuthContext'
 import { Toaster } from 'react-hot-toast'
 
 export const metadata: Metadata = {
@@ -14,19 +13,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ru" suppressHydrationWarning>
       <body>
         <ThemeProvider>
-          <AuthProvider>
-            {children}
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 3000,
-                style: {
-                  borderRadius: '12px',
-                  fontSize: '14px',
-                },
-              }}
-            />
-          </AuthProvider>
+          {children}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 3000,
+              style: {
+                borderRadius: '12px',
+                fontSize: '14px',
+              },
+            }}
+          />
         </ThemeProvider>
       </body>
     </html>

@@ -23,44 +23,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      if (user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-        setProfile(data)
+    // createClient() вызывается только в браузере (useEffect не запускается при SSR)
+    const supabase = createClient()
+
+    const init = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
+        if (user) {
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single()
+          setProfile(data)
+        }
+      } catch (e) {
+        console.error('Auth init error:', e)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
-    getUser()
+    init()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-        setProfile(data)
-      } else {
-        setProfile(null)
-      }
-    })
+    let subscription: { unsubscribe: () => void } | null = null
+    try {
+      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        setUser(session?.user ?? null)
+        if (session?.user) {
+          try {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single()
+            setProfile(profileData)
+          } catch {}
+        } else {
+          setProfile(null)
+        }
+      })
+      subscription = data.subscription
+    } catch (e) {
+      console.error('Auth subscription error:', e)
+    }
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription?.unsubscribe()
+    }
   }, [])
 
   const signOut = async () => {
-    await supabase.auth.signOut()
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch {}
   }
 
   return (

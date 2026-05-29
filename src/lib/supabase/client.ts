@@ -1,48 +1,45 @@
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
 
-// Singleton — одна инстанция на всё приложение
-let _client: ReturnType<typeof createBrowserClient> | null = null
-
-export function createClient() {
-  // В SSR-контексте (Node.js) не создаём реальный клиент — useEffect всё равно не запускается
-  if (typeof window === 'undefined') {
-    return createSsrStub()
-  }
-  if (!_client) {
-    _client = createBrowserClient(SUPABASE_URL, SUPABASE_KEY)
-  }
-  return _client
+// В Node.js (SSR) нет нативного WebSocket — предоставляем заглушку.
+// Auth и DB запросы идут через fetch (REST), WebSocket нужен только для Realtime
+// которое в приложении не используется.
+class NoopWebSocket {
+  static CONNECTING = 0
+  static OPEN = 1
+  static CLOSING = 2
+  static CLOSED = 3
+  readyState = NoopWebSocket.CLOSED
+  close() {}
+  send() {}
+  addEventListener() {}
+  removeEventListener() {}
+  dispatchEvent() { return false }
 }
 
-// Минимальная заглушка для SSR — методы никогда не вызываются в этом контексте
-function createSsrStub() {
-  const noop = () => ({})
-  const asyncNoop = async () => ({ data: { user: null, session: null }, error: null })
-  return {
+type AnyClient = SupabaseClient<any, any, any> // eslint-disable-line
+
+let _client: AnyClient | null = null
+
+export function createClient(): AnyClient {
+  if (_client) return _client
+
+  const isServer = typeof window === 'undefined'
+
+  _client = createSupabaseClient<any, any, any>(SUPABASE_URL, SUPABASE_KEY, { // eslint-disable-line
     auth: {
-      getUser: asyncNoop,
-      getSession: asyncNoop,
-      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: noop } } }),
-      signInWithPassword: asyncNoop,
-      signUp: asyncNoop,
-      signOut: asyncNoop,
+      persistSession: true,
+      detectSessionInUrl: true,
+      storageKey: 'myplatform-auth',
     },
-    from: () => ({
-      select: () => ({ eq: () => ({ single: asyncNoop, order: () => asyncNoop(), limit: () => asyncNoop() }) }),
-      insert: () => ({ select: () => ({ single: asyncNoop }) }),
-      update: () => ({ eq: () => ({ select: () => ({ single: asyncNoop }) }) }),
-      delete: () => ({ eq: asyncNoop }),
-      upsert: () => ({ select: () => ({ single: asyncNoop }) }),
-    }),
-    storage: {
-      from: () => ({
-        upload: asyncNoop,
-        remove: asyncNoop,
-        createSignedUrl: asyncNoop,
-      }),
+    realtime: {
+      transport: isServer
+        ? (NoopWebSocket as unknown as typeof WebSocket)
+        : undefined,
     },
-  } as unknown as ReturnType<typeof createBrowserClient>
+  })
+
+  return _client
 }

@@ -1,59 +1,46 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+// Supabase хранит auth токен в cookie с ключом вида sb-<ref>-auth-token
+// Проверяем наличие токена без верификации — клиент проверяет подпись сам
+function hasAuthToken(request: NextRequest): boolean {
+  const cookies = request.cookies.getAll()
+  return cookies.some(
+    (c) =>
+      (c.name.startsWith('sb-') && c.name.endsWith('-auth-token')) ||
+      c.name === 'myplatform-auth'
+  )
+}
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+  const isAuthPage = pathname === '/login' || pathname === '/register'
+
+  // Статические маршруты и API пропускаем
   if (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname === '/favicon.ico'
   ) {
-    return NextResponse.next({ request })
+    return NextResponse.next()
   }
 
-  try {
-    let supabaseResponse = NextResponse.next({ request })
+  const authenticated = hasAuthToken(request)
 
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll()
-          },
-          setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value)
-            )
-            supabaseResponse = NextResponse.next({ request })
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, options as Parameters<typeof supabaseResponse.cookies.set>[2])
-            )
-          },
-        },
-      }
-    )
-
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const { pathname } = request.nextUrl
-    const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register')
-
-    if (!user && !isAuthPage) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/login'
-      return NextResponse.redirect(url)
-    }
-
-    if (user && isAuthPage) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/dashboard'
-      return NextResponse.redirect(url)
-    }
-
-    return supabaseResponse
-  } catch {
-    return NextResponse.next({ request })
+  // Не авторизован — перенаправляем на логин (кроме самих auth-страниц)
+  if (!authenticated && !isAuthPage) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
   }
+
+  // Авторизован — не пускаем обратно на логин/регистрацию
+  if (authenticated && isAuthPage) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
+
+  return NextResponse.next()
 }
 
 export const config = {

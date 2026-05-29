@@ -36,3 +36,4 @@ node.pkg
 
 # Lock files для других пакетных менеджеров
 deno.lock
+tsconfig.tsbuildinfo

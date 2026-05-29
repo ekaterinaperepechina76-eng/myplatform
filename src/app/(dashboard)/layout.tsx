@@ -1,6 +1,9 @@
 import { Sidebar } from '@/components/layout/Sidebar'
 import { SidebarProvider } from '@/contexts/SidebarContext'
 
+// Все страницы дашборда требуют авторизации — рендерим динамически
+export const dynamic = 'force-dynamic'
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>

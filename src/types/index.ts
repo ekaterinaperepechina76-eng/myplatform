@@ -108,7 +108,7 @@ export interface BlogPost {
   user_id: string
   title: string
   content: string | null
-  type: 'post' | 'reel' | 'story' | 'idea'
+  type: 'post' | 'reel' | 'story' | 'idea' | 'funnel' | 'video' | 'podcast'
   status: 'draft' | 'scheduled' | 'published'
   scheduled_at: string | null
   platform: string

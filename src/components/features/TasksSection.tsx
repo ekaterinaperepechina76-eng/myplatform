@@ -64,10 +64,12 @@ export function TasksSection({ businessId, title }: TasksSectionProps) {
       due_date: form.due_date || null, business_id: businessId, user_id: user.id,
     }
     if (editTask) {
-      const { data } = await supabase.from('tasks').update(payload).eq('id', editTask.id).select().single()
+      const { data, error } = await supabase.from('tasks').update(payload).eq('id', editTask.id).select().single()
+      if (error) { toast.error('Ошибка сохранения'); setSaving(false); return }
       if (data) { setTasks(prev => prev.map(t => t.id === editTask.id ? data : t)); toast.success('Обновлено') }
     } else {
-      const { data } = await supabase.from('tasks').insert(payload).select().single()
+      const { data, error } = await supabase.from('tasks').insert(payload).select().single()
+      if (error) { toast.error('Ошибка сохранения'); setSaving(false); return }
       if (data) { setTasks(prev => [data, ...prev]); toast.success('Задача добавлена!') }
     }
     setSaving(false)

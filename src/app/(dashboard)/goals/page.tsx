@@ -78,13 +78,15 @@ export default function GoalsPage() {
     }
     if (editGoal) {
       const { data, error } = await supabase.from('goals').update(payload).eq('id', editGoal.id).select().single()
-      if (!error && data) {
+      if (error) { toast.error('Ошибка сохранения'); setSaving(false); return }
+      if (data) {
         setGoals(prev => prev.map(g => g.id === editGoal.id ? data : g))
         toast.success('Цель обновлена')
       }
     } else {
       const { data, error } = await supabase.from('goals').insert(payload).select().single()
-      if (!error && data) {
+      if (error) { toast.error('Ошибка сохранения'); setSaving(false); return }
+      if (data) {
         setGoals(prev => [data, ...prev])
         toast.success('Цель добавлена!')
       }

@@ -66,12 +66,13 @@ export function FinancesSection({ businessId, title }: FinancesSectionProps) {
   const saveRecord = async () => {
     if (!user || !form.amount) return
     setSaving(true)
-    const { data } = await supabase.from('financial_records').insert({
+    const { data, error } = await supabase.from('financial_records').insert({
       user_id: user.id, business_id: businessId,
       type: form.type, amount: parseFloat(form.amount),
       category: form.category, description: form.description || null,
       date: form.date, currency: form.currency,
     }).select().single()
+    if (error) { toast.error('Ошибка сохранения'); setSaving(false); return }
     if (data) {
       setRecords(prev => [data, ...prev])
       toast.success(form.type === 'income' ? 'Доход добавлен!' : 'Расход добавлен!')

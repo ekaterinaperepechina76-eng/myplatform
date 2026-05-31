@@ -86,7 +86,6 @@ export default function CalendarPage() {
   const saveEvent = async () => {
     if (!user || !form.title.trim() || !form.start_time) return
     setSaving(true)
-    // Конвертируем локальный ввод (МСК) → UTC для хранения в БД
     const { data, error } = await supabase.from('events').insert({
       user_id: user.id,
       title: form.title, description: form.description || null,
@@ -94,7 +93,12 @@ export default function CalendarPage() {
       end_time:   form.end_time ? localInputToUtc(form.end_time) : null,
       color: form.color, type: form.type,
     }).select().single()
-    if (!error && data) {
+    if (error) {
+      toast.error('Ошибка сохранения события')
+      setSaving(false)
+      return
+    }
+    if (data) {
       setEvents(prev => [...prev, data].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()))
       toast.success('Событие добавлено!')
     }

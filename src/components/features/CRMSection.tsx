@@ -57,10 +57,12 @@ export function CRMSection({ businessId, title }: CRMSectionProps) {
       notes: form.notes || null, tags, business_id: businessId, user_id: user.id,
     }
     if (editContact) {
-      const { data } = await supabase.from('crm_contacts').update(payload).eq('id', editContact.id).select().single()
+      const { data, error } = await supabase.from('crm_contacts').update(payload).eq('id', editContact.id).select().single()
+      if (error) { toast.error('Ошибка сохранения'); setSaving(false); return }
       if (data) { setContacts(prev => prev.map(c => c.id === editContact.id ? data : c)); toast.success('Обновлено') }
     } else {
-      const { data } = await supabase.from('crm_contacts').insert(payload).select().single()
+      const { data, error } = await supabase.from('crm_contacts').insert(payload).select().single()
+      if (error) { toast.error('Ошибка сохранения'); setSaving(false); return }
       if (data) { setContacts(prev => [data, ...prev]); toast.success('Контакт добавлен!') }
     }
     setSaving(false)

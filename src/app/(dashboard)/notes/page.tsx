@@ -49,18 +49,20 @@ export default function NotesPage() {
     setSaving(true)
     const tags = form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : []
     if (selectedNote && !creating) {
-      const { data } = await supabase.from('notes').update({
+      const { data, error } = await supabase.from('notes').update({
         title: form.title, content: form.content || null, type: form.type, tags,
       }).eq('id', selectedNote.id).select().single()
+      if (error) { toast.error('Ошибка сохранения'); setSaving(false); return }
       if (data) {
         setNotes(prev => prev.map(n => n.id === selectedNote.id ? data : n))
         setSelectedNote(data)
         toast.success('Сохранено')
       }
     } else {
-      const { data } = await supabase.from('notes').insert({
+      const { data, error } = await supabase.from('notes').insert({
         user_id: user.id, title: form.title, content: form.content || null, type: form.type, tags,
       }).select().single()
+      if (error) { toast.error('Ошибка сохранения'); setSaving(false); return }
       if (data) {
         setNotes(prev => [data, ...prev])
         setSelectedNote(data)

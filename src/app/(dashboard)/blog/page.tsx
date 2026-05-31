@@ -204,10 +204,12 @@ export default function BlogPage() {
       tags, user_id: user.id,
     }
     if (editPost) {
-      const { data } = await supabase.from('blog_posts').update(payload).eq('id', editPost.id).select().single()
+      const { data, error } = await supabase.from('blog_posts').update(payload).eq('id', editPost.id).select().single()
+      if (error) { toast.error('Ошибка сохранения'); setSaving(false); return }
       if (data) { setPosts(prev => prev.map(p => p.id === editPost.id ? data : p)); toast.success('Обновлено') }
     } else {
-      const { data } = await supabase.from('blog_posts').insert(payload).select().single()
+      const { data, error } = await supabase.from('blog_posts').insert(payload).select().single()
+      if (error) { toast.error('Ошибка сохранения'); setSaving(false); return }
       if (data) { setPosts(prev => [data, ...prev]); toast.success('Создано!') }
     }
     setSaving(false)
@@ -224,10 +226,11 @@ export default function BlogPage() {
 
   const addTask = async () => {
     if (!user || !newTaskTitle.trim()) return
-    const { data } = await supabase.from('blog_tasks').insert({
+    const { data, error } = await supabase.from('blog_tasks').insert({
       user_id: user.id, title: newTaskTitle.trim(),
       done: false, week_start: weekStartStr,
     }).select().single()
+    if (error) { toast.error('Ошибка сохранения задачи'); return }
     if (data) { setBlogTasks(prev => [...prev, data]); setNewTaskTitle('') }
   }
 

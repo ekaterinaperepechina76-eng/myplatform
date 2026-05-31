@@ -28,17 +28,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // createClient() вызывается только в браузере (useEffect не запускается при SSR)
     const supabase = createClient()
 
+    const ensureProfile = async (u: { id: string; email?: string; user_metadata?: Record<string, unknown> }) => {
+      const { data: existing } = await supabase.from('profiles').select('*').eq('id', u.id).single()
+      if (existing) return existing
+      const { data: created } = await supabase.from('profiles').insert({
+        id: u.id,
+        email: u.email || '',
+        full_name: (u.user_metadata?.full_name as string) || null,
+      }).select().single()
+      return created
+    }
+
     const init = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser()
         setUser(user)
         if (user) {
-          const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single()
-          setProfile(data)
+          const profile = await ensureProfile(user)
+          setProfile(profile)
         }
       } catch (e) {
         console.error('Auth init error:', e)
@@ -55,12 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null)
         if (session?.user) {
           try {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single()
-            setProfile(profileData)
+            const profile = await ensureProfile(session.user)
+            setProfile(profile)
           } catch {}
         } else {
           setProfile(null)

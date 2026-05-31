@@ -57,7 +57,8 @@ export default function WishlistPage() {
       currency: form.currency,
       category: form.category, priority: form.priority,
     }).select().single()
-    if (!error && data) {
+    if (error) { toast.error('Ошибка сохранения'); setSaving(false); return }
+    if (data) {
       setItems(prev => [data, ...prev])
       toast.success('Добавлено в вишлист! ⭐')
     }

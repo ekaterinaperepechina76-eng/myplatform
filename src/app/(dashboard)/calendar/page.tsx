@@ -99,59 +99,78 @@ export default function CalendarPage() {
 
   // ── Сохранение события ───────────────────────────────────────────────
   const saveEvent = async () => {
-    // Явные проверки с обратной связью
+    console.log('[Calendar] saveEvent вызван', {
+      authLoading,
+      userId: user?.id ?? null,
+      form,
+    })
+
     if (authLoading) {
-      toast('Подождите, идёт загрузка...', { icon: '⏳' })
+      console.log('[Calendar] authLoading=true → ждём')
+      toast('Подождите, авторизация ещё загружается...', { icon: '⏳' })
       return
     }
+
     if (!user) {
-      toast.error('Не удалось определить пользователя. Попробуйте перезагрузить страницу.')
+      console.log('[Calendar] user=null → нет сессии')
+      toast.error('Пользователь не определён. Перезагрузите страницу и войдите снова.')
       return
     }
+
     if (!form.title.trim()) {
+      console.log('[Calendar] пустое название')
       toast.error('Введите название события')
       return
     }
+
     if (!form.start_time) {
+      console.log('[Calendar] пустое start_time')
       toast.error('Укажите время начала')
       return
     }
 
     setSaving(true)
+    console.log('[Calendar] начинаем insert в Supabase...')
 
     let startUtc: string
     let endUtc: string | null = null
     try {
       startUtc = localInputToUtc(form.start_time)
       endUtc   = form.end_time ? localInputToUtc(form.end_time) : null
+      console.log('[Calendar] UTC времена:', { startUtc, endUtc })
     } catch (e) {
+      console.error('[Calendar] ошибка конвертации времени:', e)
       toast.error('Неверный формат времени')
       setSaving(false)
       return
     }
 
+    const payload = {
+      user_id:     user.id,
+      title:       form.title.trim(),
+      description: form.description || null,
+      start_time:  startUtc,
+      end_time:    endUtc,
+      color:       form.color,
+      type:        form.type,
+    }
+    console.log('[Calendar] payload для insert:', payload)
+
     const { data, error } = await supabase
       .from('events')
-      .insert({
-        user_id:     user.id,
-        title:       form.title.trim(),
-        description: form.description || null,
-        start_time:  startUtc,
-        end_time:    endUtc,
-        color:       form.color,
-        type:        form.type,
-      })
+      .insert(payload)
       .select()
       .single()
 
     setSaving(false)
 
     if (error) {
-      console.error('Supabase error (events insert):', error)
-      toast.error(`Ошибка сохранения: ${error.message}`)
+      console.error('[Calendar] Supabase error:', error)
+      toast.error(`Ошибка: ${error.message}`)
       return
     }
 
+    console.log('[Calendar] событие сохранено:', data)
     if (data) {
       setEvents(prev =>
         [...prev, data].sort(
@@ -427,9 +446,9 @@ export default function CalendarPage() {
               className="flex-1"
               loading={saving}
               onClick={saveEvent}
-              disabled={saving || authLoading}
+              disabled={saving}
             >
-              Сохранить
+              {authLoading ? 'Загрузка...' : 'Сохранить'}
             </Button>
           </div>
         </div>

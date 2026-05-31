@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { Habit, HabitLog } from '@/types'
+import { cached, invalidate } from '@/lib/cache'
 import { HABIT_COLORS, HABIT_ICONS } from '@/lib/utils'
 import { Plus, Check, Flame, Trophy, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -37,15 +38,23 @@ export default function HabitsPage() {
 
   useEffect(() => {
     if (!user) return
+    const uid = user.id
+    const monthKey = format(nowMsk, 'yyyy-MM')
     const load = async () => {
-      const [habitsRes, logsRes] = await Promise.all([
-        supabase.from('habits').select('*').eq('user_id', user.id).order('created_at'),
-        supabase.from('habit_logs').select('*').eq('user_id', user.id)
-          .gte('completed_at', format(startOfMonth(nowMsk), 'yyyy-MM-dd'))
-          .lte('completed_at', format(endOfMonth(nowMsk), 'yyyy-MM-dd')),
+      const [habits, logs] = await Promise.all([
+        cached<Habit[]>(`habits-${uid}`, async () => {
+          const r = await supabase.from('habits').select('*').eq('user_id', uid).order('created_at')
+          return r.data || []
+        }),
+        cached<HabitLog[]>(`habit_logs-${uid}-${monthKey}`, async () => {
+          const r = await supabase.from('habit_logs').select('*').eq('user_id', uid)
+            .gte('completed_at', format(startOfMonth(nowMsk), 'yyyy-MM-dd'))
+            .lte('completed_at', format(endOfMonth(nowMsk), 'yyyy-MM-dd'))
+          return r.data || []
+        }, 20_000),
       ])
-      setHabits(habitsRes.data || [])
-      setLogs(logsRes.data || [])
+      setHabits(habits)
+      setLogs(logs)
       setLoading(false)
     }
     load()
@@ -73,6 +82,7 @@ export default function HabitsPage() {
   const toggleHabit = async (habit: Habit) => {
     if (!user) return
     const completed = isCompletedToday(habit.id)
+    invalidate(`habit_logs-${user.id}`)
     if (completed) {
       const log = logs.find(l => l.habit_id === habit.id && l.completed_at === today)
       if (log) {

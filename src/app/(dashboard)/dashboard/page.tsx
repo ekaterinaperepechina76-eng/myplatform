@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/Badge'
 import { Progress } from '@/components/ui/Progress'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/contexts/AuthContext'
-import { Task, Habit, Goal, CalendarEvent } from '@/types'
+import { Task, Habit, HabitLog, Goal, CalendarEvent } from '@/types'
 import { formatDate, formatShortDate } from '@/lib/utils'
 import { todayMoscow, nowMoscow, formatShortDateMoscow, formatTimeMoscow } from '@/lib/tz'
+import { cached, invalidate } from '@/lib/cache'
 import {
   CheckSquare, Target, Heart, Calendar, TrendingUp,
   Clock, Star, ArrowRight
@@ -42,32 +43,27 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return
+    const uid = user.id
     const load = async () => {
-      const [tasksRes, habitsRes, habitsLogRes, goalsRes, eventsRes] = await Promise.all([
-        supabase.from('tasks').select('*').eq('user_id', user.id),
-        supabase.from('habits').select('*').eq('user_id', user.id),
-        supabase.from('habit_logs').select('*').eq('user_id', user.id).eq('completed_at', today),
-        supabase.from('goals').select('*').eq('user_id', user.id).eq('status', 'active').limit(4),
-        supabase.from('events').select('*').eq('user_id', user.id).gte('start_time', today).order('start_time').limit(5),
+      const [tasks, habits, habitLogs, goalData, eventData] = await Promise.all([
+        cached<Task[]>(`tasks-${uid}`, async () => { const r = await supabase.from('tasks').select('*').eq('user_id', uid); return r.data || [] }),
+        cached<Habit[]>(`habits-${uid}`, async () => { const r = await supabase.from('habits').select('*').eq('user_id', uid); return r.data || [] }),
+        cached<HabitLog[]>(`habit_logs-${uid}-${today}`, async () => { const r = await supabase.from('habit_logs').select('*').eq('user_id', uid).eq('completed_at', today); return r.data || [] }, 30_000),
+        cached<Goal[]>(`goals-active-${uid}`, async () => { const r = await supabase.from('goals').select('*').eq('user_id', uid).eq('status', 'active').limit(4); return r.data || [] }),
+        cached<CalendarEvent[]>(`events-upcoming-${uid}`, async () => { const r = await supabase.from('events').select('*').eq('user_id', uid).gte('start_time', today).order('start_time').limit(5); return r.data || [] }, 30_000),
       ])
 
-      const tasks = tasksRes.data || []
-      const habits = habitsRes.data || []
-      const habitLogs = habitsLogRes.data || []
-      const goalData = goalsRes.data || []
-      const eventData = eventsRes.data || []
-
       const avgProgress = goalData.length
-        ? Math.round(goalData.reduce((s, g) => s + g.progress, 0) / goalData.length)
+        ? Math.round(goalData.reduce((s: number, g: Goal) => s + g.progress, 0) / goalData.length)
         : 0
 
       setStats({
-        tasks: { total: tasks.length, done: tasks.filter(t => t.status === 'done').length },
+        tasks: { total: tasks.length, done: tasks.filter((t: Task) => t.status === 'done').length },
         habits: { total: habits.length, completedToday: habitLogs.length },
         goals: { total: goalData.length, avgProgress },
         events: eventData,
       })
-      setRecentTasks(tasks.filter(t => t.status !== 'done').slice(0, 5))
+      setRecentTasks(tasks.filter((t: Task) => t.status !== 'done').slice(0, 5))
       setGoals(goalData)
       setLoading(false)
     }
